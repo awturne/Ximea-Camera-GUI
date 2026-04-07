@@ -40,4 +40,5 @@ python ximea_gui.py
 
 ## Notes
 - The app saves monochrome TIFF images with timestamped filenames.
+- Live preview uses auto-contrast stretching for better on-screen visibility in low-light scenes.
 - If `ximea-python` import fails, ensure the XiAPI SDK/drivers are installed and visible to Python.

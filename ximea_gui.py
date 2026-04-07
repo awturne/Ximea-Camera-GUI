@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 import cv2
+import numpy as np
 from PIL import Image, ImageTk
 
 try:
@@ -171,8 +172,7 @@ class XimeaApp:
             try:
                 self.camera.get_image(self.image)
                 frame = self._to_mono16(self.image.get_image_data_numpy())
-                preview_u8 = cv2.convertScaleAbs(frame, alpha=255.0 / 65535.0)
-                preview_rgb = cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
+                preview_rgb = self._mono16_to_preview_rgb(frame)
                 with self._latest_lock:
                     self.latest_frame = frame.copy()
                     self.latest_preview_rgb = preview_rgb
@@ -188,6 +188,17 @@ class XimeaApp:
         if frame.dtype == "uint8":
             return frame.astype("uint16") << 8
         return frame.astype("uint16")
+
+    def _mono16_to_preview_rgb(self, frame):
+        sample = frame[::4, ::4]
+        low = float(np.percentile(sample, 1.0))
+        high = float(np.percentile(sample, 99.5))
+        if high <= low:
+            preview_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        else:
+            clipped = np.clip(frame, low, high)
+            preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
+        return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
 
     def _ui_preview_tick(self) -> None:
         if self.preview_running:
