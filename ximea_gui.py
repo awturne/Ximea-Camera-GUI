@@ -45,11 +45,20 @@ class XimeaApp:
         self.preview_refresh_ms = 15
         self.capture_end_time = None
         self.countdown_var = tk.StringVar(value="Countdown: --")
+        self.active_fps = 0.0
+        self.mean_intensity = 0.0
+        self.temperature_c = None
+        self._last_frame_ts = None
+        self._last_temp_ts = 0.0
+        self.fps_var = tk.StringVar(value="FPS: --")
+        self.mean_var = tk.StringVar(value="Mean DN: --")
+        self.temp_var = tk.StringVar(value="Temp: --")
 
         self._build_ui()
         self._set_status("Disconnected")
         self.root.after(self.preview_refresh_ms, self._ui_preview_tick)
         self.root.after(200, self._countdown_tick)
+        self.root.after(400, self._telemetry_tick)
 
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -120,6 +129,10 @@ class XimeaApp:
 
         self.status_var = tk.StringVar(value="")
         ttk.Label(right, textvariable=self.status_var, wraplength=320, justify=tk.LEFT).pack(fill=tk.X)
+        ttk.Separator(right, orient="horizontal").pack(fill=tk.X, pady=(8, 6))
+        ttk.Label(right, textvariable=self.fps_var, justify=tk.LEFT).pack(fill=tk.X)
+        ttk.Label(right, textvariable=self.mean_var, justify=tk.LEFT).pack(fill=tk.X)
+        ttk.Label(right, textvariable=self.temp_var, justify=tk.LEFT).pack(fill=tk.X)
 
         for frame in (controls, timed):
             frame.columnconfigure(1, weight=1)
@@ -186,6 +199,17 @@ class XimeaApp:
                 self.camera.get_image(self.image)
                 frame = self._to_mono16(self.image.get_image_data_numpy())
                 preview_rgb = self._mono16_to_preview_rgb(frame)
+                now = time.monotonic()
+                if self._last_frame_ts is not None:
+                    dt = now - self._last_frame_ts
+                    if dt > 0:
+                        inst_fps = 1.0 / dt
+                        self.active_fps = (0.85 * self.active_fps) + (0.15 * inst_fps) if self.active_fps > 0 else inst_fps
+                self._last_frame_ts = now
+                self.mean_intensity = float(frame.mean())
+                if now - self._last_temp_ts >= 1.0:
+                    self.temperature_c = self._read_camera_temperature()
+                    self._last_temp_ts = now
                 with self._latest_lock:
                     self.latest_frame = frame.copy()
                     self.latest_preview_rgb = preview_rgb
@@ -379,11 +403,52 @@ class XimeaApp:
     def _save_uncompressed_tif(self, file_path: Path, frame) -> bool:
         return bool(cv2.imwrite(str(file_path), frame, [cv2.IMWRITE_TIFF_COMPRESSION, 1]))
 
+    def _read_camera_temperature(self):
+        if self.camera is None:
+            return None
+        getter_names = ["get_temp", "get_sensor_board_temp", "get_device_temperature"]
+        for getter_name in getter_names:
+            if hasattr(self.camera, getter_name):
+                try:
+                    return float(getattr(self.camera, getter_name)())
+                except Exception:
+                    continue
+        param_names = [
+            "device_temperature",
+            "sensor_board_temp",
+            "XI_PRM_DEVICE_TEMPERATURE",
+            "XI_PRM_SENSOR_BOARD_TEMP",
+        ]
+        for param_name in param_names:
+            try:
+                return float(self.camera.get_param(param_name))
+            except Exception:
+                continue
+        return None
+
+    def _telemetry_tick(self) -> None:
+        if self.preview_running:
+            self.fps_var.set(f"FPS: {self.active_fps:0.2f}")
+            self.mean_var.set(f"Mean DN: {self.mean_intensity:0.1f}")
+            if self.temperature_c is None:
+                self.temp_var.set("Temp: N/A")
+            else:
+                self.temp_var.set(f"Temp: {self.temperature_c:0.1f} °C")
+        else:
+            self.fps_var.set("FPS: --")
+            self.mean_var.set("Mean DN: --")
+            self.temp_var.set("Temp: --")
+        self.root.after(400, self._telemetry_tick)
+
     def stop_preview(self) -> None:
         self.capture_running = False
         self.capture_end_time = None
         self.countdown_var.set("Countdown: --")
         self.preview_running = False
+        self.active_fps = 0.0
+        self.mean_intensity = 0.0
+        self.temperature_c = None
+        self._last_frame_ts = None
         with self._latest_lock:
             self.latest_frame = None
             self.latest_preview_rgb = None
