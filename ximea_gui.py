@@ -324,7 +324,7 @@ class XimeaApp:
                 if frame is not None:
                     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                     file_path = capture_dir / f"frame_{count:06d}_{stamp}.tif"
-                    cv2.imwrite(str(file_path), frame)
+                    self._save_uncompressed_tif(file_path, frame)
                     count += 1
                     self.root.after(0, lambda c=count, p=file_path: self._set_status(f"Saved {c} frames. Latest: {p.name}"))
                 next_shot += cfg.interval_s
@@ -365,7 +365,7 @@ class XimeaApp:
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         file_path = capture_dir / f"single_{stamp}.tif"
-        cv2.imwrite(str(file_path), frame)
+        self._save_uncompressed_tif(file_path, frame)
         self._set_status(f"Single capture saved: {file_path.name}")
 
     def _countdown_tick(self) -> None:
@@ -375,6 +375,9 @@ class XimeaApp:
         else:
             self.countdown_var.set("Countdown: --")
         self.root.after(200, self._countdown_tick)
+
+    def _save_uncompressed_tif(self, file_path: Path, frame) -> bool:
+        return bool(cv2.imwrite(str(file_path), frame, [cv2.IMWRITE_TIFF_COMPRESSION, 1]))
 
     def stop_preview(self) -> None:
         self.capture_running = False
