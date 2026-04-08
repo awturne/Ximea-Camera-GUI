@@ -42,5 +42,5 @@ python ximea_gui.py
 ## Notes
 - The app saves monochrome raw `.tif` images with timestamped filenames.
 - Live preview uses auto-contrast stretching for better on-screen visibility in low-light scenes.
-- Camera black level is forced to `0` on connect/settings apply.
+- Camera black level is set to `0` on connect/settings apply (using XiAPI direct method when available, otherwise via sensor feature selector/value params).
 - If `ximea-python` import fails, ensure the XiAPI SDK/drivers are installed and visible to Python.

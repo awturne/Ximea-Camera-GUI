@@ -163,7 +163,7 @@ class XimeaApp:
             self.camera.open_device()
             self.image = xiapi.Image()
             self.camera.set_imgdataformat("XI_MONO16")
-            self.camera.set_black_level(0)
+            black_ok = self._set_black_level_zero()
             self.apply_camera_settings(show_message=False)
             self.camera.start_acquisition()
         except Exception as exc:
@@ -175,7 +175,10 @@ class XimeaApp:
         self.preview_running = True
         self.preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
         self.preview_thread.start()
-        self._set_status("Preview running")
+        if black_ok:
+            self._set_status("Preview running")
+        else:
+            self._set_status("Preview running (warning: could not set sensor black level offset to 0)")
 
     def _preview_loop(self) -> None:
         while self.preview_running and self.camera is not None:
@@ -226,6 +229,47 @@ class XimeaApp:
         self.preview_label.configure(image=img, text="")
         self.preview_label.image = img
 
+    def _set_black_level_zero(self) -> bool:
+        if self.camera is None:
+            return False
+
+        restarted = False
+        if self.preview_running:
+            try:
+                self.camera.stop_acquisition()
+                restarted = True
+            except Exception:
+                restarted = False
+
+        success = False
+        try:
+            if hasattr(self.camera, "set_black_level"):
+                self.camera.set_black_level(0)
+                success = True
+            else:
+                selector_names = ["sensor_feature_selector", "XI_PRM_SENSOR_FEATURE_SELECTOR"]
+                value_names = ["sensor_feature_value", "XI_PRM_SENSOR_FEATURE_VALUE"]
+                for selector_name in selector_names:
+                    for value_name in value_names:
+                        try:
+                            self.camera.set_param(selector_name, "XI_SENSOR_FEATURE_ACQUISITION_RUNNING_STATUS")
+                            self.camera.set_param(value_name, 0)
+                            self.camera.set_param(selector_name, "XI_SENSOR_FEATURE_BLACK_LEVEL_OFFSET_RAW")
+                            self.camera.set_param(value_name, 0)
+                            success = True
+                            break
+                        except Exception:
+                            continue
+                    if success:
+                        break
+        finally:
+            if restarted:
+                try:
+                    self.camera.start_acquisition()
+                except Exception:
+                    pass
+        return success
+
     def apply_camera_settings(self, show_message: bool = True) -> None:
         if self.camera is None:
             if show_message:
@@ -236,9 +280,10 @@ class XimeaApp:
             self.camera.set_framerate(cfg.frame_rate)
             self.camera.set_exposure(cfg.exposure_us)
             self.camera.set_gain(cfg.gain_db)
-            self.camera.set_black_level(0)
+            black_ok = self._set_black_level_zero()
             self._set_status(
-                f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB, black level=0"
+                f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB"
+                + (", black level=0" if black_ok else ", black level=0 not supported by current XiAPI binding")
             )
         except Exception as exc:
             messagebox.showerror("Settings error", str(exc))
