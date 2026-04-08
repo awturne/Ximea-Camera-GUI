@@ -20,6 +20,7 @@ except Exception:  # pragma: no cover
 class CaptureConfig:
     frame_rate: float
     exposure_us: int
+    gain_db: float
     interval_s: float
     duration_s: float
     output_root: Path
@@ -73,8 +74,12 @@ class XimeaApp:
         self.exposure_var = tk.StringVar(value="10000")
         ttk.Entry(controls, textvariable=self.exposure_var, width=18).grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
 
+        ttk.Label(controls, text="Gain (dB)").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        self.gain_var = tk.StringVar(value="0")
+        ttk.Entry(controls, textvariable=self.gain_var, width=18).grid(row=2, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
+
         ttk.Button(controls, text="Apply Camera Settings", command=self.apply_camera_settings).grid(
-            row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0)
+            row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0)
         )
 
         timed = ttk.LabelFrame(right, text="Timed Capture", padding=10)
@@ -125,6 +130,7 @@ class XimeaApp:
     def _parse_config(self) -> CaptureConfig:
         frame_rate = float(self.frame_rate_var.get())
         exposure = int(float(self.exposure_var.get()))
+        gain = float(self.gain_var.get())
         interval = float(self.interval_var.get())
         duration = float(self.duration_var.get())
         root_path = Path(self.path_var.get().strip())
@@ -133,9 +139,12 @@ class XimeaApp:
             raise ValueError("Folder name cannot be empty.")
         if frame_rate <= 0 or exposure <= 0 or interval <= 0 or duration <= 0:
             raise ValueError("Frame rate, exposure, interval, and duration must all be > 0.")
+        if gain < 0:
+            raise ValueError("Gain must be >= 0.")
         return CaptureConfig(
             frame_rate=frame_rate,
             exposure_us=exposure,
+            gain_db=gain,
             interval_s=interval,
             duration_s=duration,
             output_root=root_path,
@@ -154,6 +163,7 @@ class XimeaApp:
             self.camera.open_device()
             self.image = xiapi.Image()
             self.camera.set_imgdataformat("XI_MONO16")
+            self.camera.set_black_level(0)
             self.apply_camera_settings(show_message=False)
             self.camera.start_acquisition()
         except Exception as exc:
@@ -225,7 +235,11 @@ class XimeaApp:
             cfg = self._parse_config()
             self.camera.set_framerate(cfg.frame_rate)
             self.camera.set_exposure(cfg.exposure_us)
-            self._set_status(f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us")
+            self.camera.set_gain(cfg.gain_db)
+            self.camera.set_black_level(0)
+            self._set_status(
+                f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB, black level=0"
+            )
         except Exception as exc:
             messagebox.showerror("Settings error", str(exc))
             self._set_status(f"Failed to apply settings: {exc}")
@@ -264,7 +278,7 @@ class XimeaApp:
                     frame = None if self.latest_frame is None else self.latest_frame.copy()
                 if frame is not None:
                     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                    file_path = capture_dir / f"frame_{count:06d}_{stamp}.tiff"
+                    file_path = capture_dir / f"frame_{count:06d}_{stamp}.tif"
                     cv2.imwrite(str(file_path), frame)
                     count += 1
                     self.root.after(0, lambda c=count, p=file_path: self._set_status(f"Saved {c} frames. Latest: {p.name}"))
@@ -305,7 +319,7 @@ class XimeaApp:
             return
 
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        file_path = capture_dir / f"single_{stamp}.tiff"
+        file_path = capture_dir / f"single_{stamp}.tif"
         cv2.imwrite(str(file_path), frame)
         self._set_status(f"Single capture saved: {file_path.name}")
 

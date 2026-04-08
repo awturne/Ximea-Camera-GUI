@@ -7,11 +7,12 @@ Desktop GUI (Tkinter) for XIMEA camera live preview and interval-based frame cap
 - User controls for:
   - Frame rate (fps)
   - Exposure time (microseconds)
+  - Gain (dB)
   - Capture interval (seconds)
   - Capture duration (seconds)
   - Save root path (defaults to `C:\XIMEA`)
   - Output folder name
-- Timed frame capture that saves 16-bit TIFF images (Mono12 data in 16-bit container) to:
+- Timed frame capture that saves 16-bit raw `.tif` images (Mono12 data in 16-bit container) to:
   - `C:\XIMEA\<your_folder_name>` (by default)
 - A single-capture button for one-shot image save.
 - Countdown display for remaining timed-capture duration.
@@ -39,6 +40,7 @@ python ximea_gui.py
 7. Click **Single Capture** for one image, or **Stop Timed Capture** to end early.
 
 ## Notes
-- The app saves monochrome TIFF images with timestamped filenames.
+- The app saves monochrome raw `.tif` images with timestamped filenames.
 - Live preview uses auto-contrast stretching for better on-screen visibility in low-light scenes.
+- Camera black level is forced to `0` on connect/settings apply.
 - If `ximea-python` import fails, ensure the XiAPI SDK/drivers are installed and visible to Python.
