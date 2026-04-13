@@ -63,10 +63,16 @@ class XimeaApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def _build_ui(self) -> None:
-        left = ttk.Frame(self.root, padding=12)
+        self.content_container = ttk.Frame(self.root)
+        self.content_container.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        self.setup_tab = ttk.Frame(self.content_container)
+        self.setup_tab.pack(fill=tk.BOTH, expand=True)
+
+        left = ttk.Frame(self.setup_tab, padding=12)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        right = ttk.Frame(self.root, padding=12)
+        right = ttk.Frame(self.setup_tab, padding=12)
         right.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.preview_label = ttk.Label(left, text="No preview yet", anchor="center")
@@ -136,6 +142,32 @@ class XimeaApp:
 
         for frame in (controls, timed):
             frame.columnconfigure(1, weight=1)
+
+        self.demo_tab = ttk.Frame(self.content_container, padding=12)
+        self.demo_preview_label = ttk.Label(self.demo_tab, text="No preview yet", anchor="center")
+        self.demo_preview_label.pack(fill=tk.BOTH, expand=True)
+
+        tabs_bar = ttk.Frame(self.root, padding=(12, 0, 12, 10))
+        tabs_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        ttk.Separator(tabs_bar, orient="horizontal").pack(fill=tk.X, pady=(0, 6))
+        tabs_row = ttk.Frame(tabs_bar)
+        tabs_row.pack(anchor="w")
+        self.current_tab = tk.StringVar(value="Setup")
+        ttk.Radiobutton(tabs_row, text="Setup", value="Setup", variable=self.current_tab, command=self._switch_tab).pack(
+            side=tk.LEFT, padx=(0, 8)
+        )
+        ttk.Radiobutton(tabs_row, text="Demo", value="Demo", variable=self.current_tab, command=self._switch_tab).pack(
+            side=tk.LEFT
+        )
+
+    def _switch_tab(self) -> None:
+        selected = self.current_tab.get()
+        self.setup_tab.pack_forget()
+        self.demo_tab.pack_forget()
+        if selected == "Demo":
+            self.demo_tab.pack(fill=tk.BOTH, expand=True)
+        else:
+            self.setup_tab.pack(fill=tk.BOTH, expand=True)
 
     def _set_status(self, text: str) -> None:
         self.status_var.set(f"Status: {text}")
@@ -252,6 +284,8 @@ class XimeaApp:
     def _update_preview(self, img: ImageTk.PhotoImage) -> None:
         self.preview_label.configure(image=img, text="")
         self.preview_label.image = img
+        self.demo_preview_label.configure(image=img, text="")
+        self.demo_preview_label.image = img
 
     def _set_black_level_zero(self) -> bool:
         if self.camera is None:

@@ -17,6 +17,9 @@ Desktop GUI (Tkinter) for XIMEA camera live preview and interval-based frame cap
 - A single-capture button for one-shot image save.
 - Countdown display for remaining timed-capture duration.
 - Live telemetry readouts at the bottom of the GUI for active FPS, frame mean DN, and camera temperature (when available from XiAPI).
+- Bottom tab switcher with:
+  - **Setup**: full controls + preview
+  - **Demo**: preview-only view using the same active camera/settings/session
 
 ## Prerequisites (Windows)
 1. Install **XIMEA camera drivers + XiAPI SDK** from XIMEA.
