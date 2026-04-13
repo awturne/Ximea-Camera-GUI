@@ -380,14 +380,10 @@ class XimeaApp:
         return frame.astype("uint16")
 
     def _mono16_to_preview_rgb(self, frame):
-        sample = frame[::4, ::4]
-        low = float(np.percentile(sample, 1.0))
-        high = float(np.percentile(sample, 99.5))
-        if high <= low:
-            preview_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        else:
-            clipped = np.clip(frame, low, high)
-            preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
+        # Fixed preview mapping (no auto-brightness / LUT adaptation).
+        # Display uses a constant Mono12 scale: 0..4095 DN -> 0..255.
+        frame_u16 = frame.astype("uint16", copy=False)
+        preview_u8 = (np.clip(frame_u16, 0, 4095) >> 4).astype("uint8")
         return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
 
     def _ui_preview_tick(self) -> None:
