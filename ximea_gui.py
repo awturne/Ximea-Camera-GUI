@@ -116,6 +116,7 @@ class XimeaApp:
         self.fps_var = tk.StringVar(value="FPS: --")
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
+        self.active_img_format = "unknown"
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -289,7 +290,7 @@ class XimeaApp:
             self.camera = xiapi.Camera()
             self.camera.open_device()
             self.image = xiapi.Image()
-            self.camera.set_imgdataformat("XI_MONO16")
+            self.active_img_format = self._set_image_format()
             black_ok = self._set_black_level_zero()
             self.apply_camera_settings(show_message=False)
             self.camera.start_acquisition()
@@ -303,9 +304,25 @@ class XimeaApp:
         self.preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
         self.preview_thread.start()
         if black_ok:
-            self._set_status("Preview running")
+            self._set_status(f"Preview running ({self.active_img_format})")
         else:
-            self._set_status("Preview running (warning: could not set sensor black level offset to 0)")
+            self._set_status(
+                f"Preview running ({self.active_img_format}, warning: could not set sensor black level offset to 0)"
+            )
+
+    def _set_image_format(self) -> str:
+        if self.camera is None:
+            raise RuntimeError("Camera is not connected.")
+
+        preferred = ["XI_MONO16", "XI_RAW16", "XI_MONO8"]
+        last_error = None
+        for fmt in preferred:
+            try:
+                self.camera.set_imgdataformat(fmt)
+                return fmt
+            except Exception as exc:
+                last_error = exc
+        raise RuntimeError(f"imgdataformat unsupported for formats {preferred}: {last_error}")
 
     def _preview_loop(self) -> None:
         while self.preview_running and self.camera is not None:

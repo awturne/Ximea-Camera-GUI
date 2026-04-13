@@ -47,6 +47,7 @@ python ximea_gui.py
 ## Notes
 - The app saves monochrome raw `.tif` images with timestamped filenames using uncompressed TIFF output.
 - Live preview uses auto-contrast stretching for better on-screen visibility in low-light scenes.
+- On connect, the app auto-selects first supported image format from `XI_MONO16`, `XI_RAW16`, then `XI_MONO8`.
 - Camera black level is set to `0` on connect/settings apply (using XiAPI direct method when available, otherwise via sensor feature selector/value params).
 - If `ximea-python` import fails on Windows, the app now auto-checks XiAPI locations under `C:\XIMEA\API`.
 - The app first tries `from ximea import xiapi`, then falls back to direct `import xiapi` from XiAPI SDK path(s) if available.
