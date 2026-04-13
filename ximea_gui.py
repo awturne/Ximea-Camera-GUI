@@ -335,14 +335,11 @@ class XimeaApp:
         return frame.astype("uint16")
 
     def _mono16_to_preview_rgb(self, frame):
-        sample = frame[::4, ::4]
-        low = float(np.percentile(sample, 1.0))
-        high = float(np.percentile(sample, 99.5))
-        if high <= low:
-            preview_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        else:
-            clipped = np.clip(frame, low, high)
-            preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
+        # Fixed preview mapping (no auto-brightness/auto-contrast):
+        # assume Mono12 values in 16-bit container and map 0..4095 -> 0..255.
+        frame_u16 = frame.astype("uint16", copy=False)
+        preview_u8 = np.clip(frame_u16, 0, 4095).astype("uint16")
+        preview_u8 = (preview_u8 >> 4).astype("uint8")
         return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
 
     def _ui_preview_tick(self) -> None:
@@ -380,9 +377,17 @@ class XimeaApp:
             if hasattr(self.camera, "set_black_level"):
                 self.camera.set_black_level(0)
                 success = True
-            else:
-                selector_names = ["sensor_feature_selector", "XI_PRM_SENSOR_FEATURE_SELECTOR"]
-                value_names = ["sensor_feature_value", "XI_PRM_SENSOR_FEATURE_VALUE"]
+            if not success:
+                for param_name in ("black_level", "XI_PRM_BLACK_LEVEL", "black_level_offset"):
+                    try:
+                        self.camera.set_param(param_name, 0)
+                        success = True
+                        break
+                    except Exception:
+                        continue
+            if not success:
+                selector_names = ("sensor_feature_selector", "XI_PRM_SENSOR_FEATURE_SELECTOR")
+                value_names = ("sensor_feature_value", "XI_PRM_SENSOR_FEATURE_VALUE")
                 for selector_name in selector_names:
                     for value_name in value_names:
                         try:

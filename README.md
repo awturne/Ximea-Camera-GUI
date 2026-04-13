@@ -50,7 +50,7 @@ python ximea_gui.py
 
 ## Notes
 - The app saves monochrome raw `.tif` images with timestamped filenames using uncompressed TIFF output.
-- Live preview uses auto-contrast stretching for better on-screen visibility in low-light scenes.
+- Live preview uses fixed mapping (no auto-brightness/auto-contrast): Mono12 counts are displayed from 0..4095.
 - On connect, the app explicitly sets image format to `XI_MONO16` (with `XI_RAW16` fallback) and fails fast if neither is accepted.
 - Applying camera settings uses direct XiAPI setters (`set_exposure`, `set_framerate`, `set_gain`) and reports errors directly if a command fails.
 - Camera black level is set to `0` on connect/settings apply (using XiAPI direct method when available, otherwise via sensor feature selector/value params).
