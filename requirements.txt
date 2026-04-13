@@ -1,0 +1,3 @@
+opencv-python
+Pillow
+ximea-python; python_version < "3.13"
