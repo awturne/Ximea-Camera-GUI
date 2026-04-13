@@ -276,7 +276,9 @@ class XimeaApp:
         self.preview_running = True
         self.preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
         self.preview_thread.start()
-        format_note = f"{self.active_img_format}" + (f", {self.image_format_warning}" if self.image_format_warning else "")
+        format_note = self.active_img_format
+        if self.image_format_warning:
+            format_note = f"{format_note} ({self.image_format_warning})"
         if black_ok:
             self._set_status(f"Preview running ({format_note})")
         else:
@@ -364,6 +366,16 @@ class XimeaApp:
         if frame.dtype == "uint16":
             return frame
         if frame.dtype == "uint8":
+            # Some XiAPI/default modes return 16-bit pixels as a uint8 byte stream
+            # (little-endian pairs). Unpack when width is even and format is 16-bit-ish.
+            if (
+                len(frame.shape) == 2
+                and frame.shape[1] % 2 == 0
+                and self.active_img_format in {"XI_MONO16", "XI_RAW16", "camera-default"}
+            ):
+                low = frame[:, 0::2].astype("uint16")
+                high = frame[:, 1::2].astype("uint16")
+                return (high << 8) | low
             return frame.astype("uint16") << 8
         return frame.astype("uint16")
 
