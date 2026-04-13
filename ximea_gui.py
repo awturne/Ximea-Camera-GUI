@@ -304,13 +304,23 @@ class XimeaApp:
         scale = min(max_w / w, max_h / h)
         return cv2.resize(rgb, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
+    def _center_crop_demo_square(self, rgb, size: int = 1212):
+        h, w = rgb.shape[:2]
+        crop_size = min(size, h, w)
+        x0 = max(0, (w - crop_size) // 2)
+        y0 = max(0, (h - crop_size) // 2)
+        cropped = rgb[y0 : y0 + crop_size, x0 : x0 + crop_size]
+        if crop_size != size:
+            return cv2.resize(cropped, (size, size), interpolation=cv2.INTER_AREA)
+        return cropped
+
     def _update_preview_labels(self, rgb) -> None:
         setup_disp = self._fit_rgb_to_box(rgb, 900, 680)
         setup_img = ImageTk.PhotoImage(Image.fromarray(setup_disp))
         self.preview_label.configure(image=setup_img, text="")
         self.preview_label.image = setup_img
 
-        demo_disp = self._fit_rgb_to_box(rgb, 1100, 700)
+        demo_disp = self._center_crop_demo_square(rgb, size=1212)
         demo_img = ImageTk.PhotoImage(Image.fromarray(demo_disp))
         self.demo_preview_label.configure(image=demo_img, text="")
         self.demo_preview_label.image = demo_img
