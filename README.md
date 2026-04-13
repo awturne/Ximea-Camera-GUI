@@ -44,7 +44,7 @@ python ximea_gui.py
 ## Notes
 - The app saves monochrome raw `.tif` images with timestamped filenames using uncompressed TIFF output.
 - Live preview uses a fixed display mapping (no auto-brightness/auto-LUT): Mono12 values are shown with constant scaling from 0..4095 DN.
-- If XiAPI returns preview buffers as byte streams in default/RAW16 modes, the app unpacks little-endian byte pairs to reconstruct 16-bit grayscale before display/save.
+- If XiAPI returns preview buffers as byte streams in `XI_MONO16`/`XI_RAW16` modes, the app unpacks little-endian byte pairs to reconstruct 16-bit grayscale before display/save.
 - On connect, the app tries `XI_MONO16`, `XI_RAW16`, then `XI_MONO8` (via both direct setter and param fallback). If all are unsupported, it continues with the camera default image format.
 - Applying camera settings is best-effort: unsupported params (for example fixed framerate on some modes) are reported in status instead of hard-failing preview.
 - Camera black level is set to `0` on connect/settings apply (using XiAPI direct method when available, otherwise via sensor feature selector/value params).

@@ -371,7 +371,7 @@ class XimeaApp:
             if (
                 len(frame.shape) == 2
                 and frame.shape[1] % 2 == 0
-                and self.active_img_format in {"XI_MONO16", "XI_RAW16", "camera-default"}
+                and self.active_img_format in {"XI_MONO16", "XI_RAW16"}
             ):
                 low = frame[:, 0::2].astype("uint16")
                 high = frame[:, 1::2].astype("uint16")
