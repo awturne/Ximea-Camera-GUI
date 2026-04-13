@@ -18,13 +18,23 @@ def _bootstrap_ximea_paths() -> list[str]:
         return added_paths
 
     xiapi_root = Path(os.environ.get("XIAPI_DIR", r"C:\XIMEA\API"))
+    python_root = xiapi_root / "Python"
     candidates = [
-        xiapi_root / "Python",
+        python_root,
         xiapi_root / "xiAPI" / "Python",
         xiapi_root / "xiapi" / "Python",
         xiapi_root / "xiAPI",
         xiapi_root / "xiapi",
     ]
+
+    if python_root.exists():
+        for subdir in python_root.iterdir():
+            if not subdir.is_dir():
+                continue
+            has_ximea_pkg = (subdir / "ximea").is_dir()
+            has_xiapi_module = (subdir / "xiapi.py").exists()
+            if has_ximea_pkg or has_xiapi_module:
+                candidates.append(subdir)
     for path in candidates:
         if path.exists():
             path_str = str(path)
@@ -262,8 +272,8 @@ class XimeaApp:
                 extra += f"\n\nImport error:\n{_XIMEA_IMPORT_ERROR}"
             messagebox.showerror(
                 "Missing dependency",
-                "ximea-python / XiAPI could not be imported.\n"
-                "Install Python requirements and ensure XiAPI SDK is installed."
+                "XiAPI Python bindings could not be imported.\n"
+                "Install Python requirements OR ensure XiAPI SDK Python bindings are present."
                 + extra,
             )
             return
