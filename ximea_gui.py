@@ -66,14 +66,30 @@ class XimeaApp:
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def _build_ui(self) -> None:
-        left = ttk.Frame(self.root, padding=12)
+        notebook_style = ttk.Style(self.root)
+        try:
+            notebook_style.configure("Bottom.TNotebook", tabposition="s")
+        except Exception:
+            notebook_style.configure("Bottom.TNotebook")
+        self.main_notebook = ttk.Notebook(self.root, style="Bottom.TNotebook")
+        self.main_notebook.pack(fill=tk.BOTH, expand=True)
+
+        setup_tab = ttk.Frame(self.main_notebook)
+        demo_tab = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(setup_tab, text="Setup")
+        self.main_notebook.add(demo_tab, text="Demo")
+
+        left = ttk.Frame(setup_tab, padding=12)
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        right = ttk.Frame(self.root, padding=12)
+        right = ttk.Frame(setup_tab, padding=12)
         right.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.preview_label = ttk.Label(left, text="No preview yet", anchor="center")
         self.preview_label.pack(fill=tk.BOTH, expand=True)
+
+        self.demo_preview_label = ttk.Label(demo_tab, text="No preview yet", anchor="center", padding=12)
+        self.demo_preview_label.pack(fill=tk.BOTH, expand=True)
 
         controls = ttk.LabelFrame(right, text="Camera Controls", padding=10)
         controls.pack(fill=tk.X, pady=(0, 10))
@@ -280,16 +296,24 @@ class XimeaApp:
             with self._latest_lock:
                 rgb = None if self.latest_preview_rgb is None else self.latest_preview_rgb.copy()
             if rgb is not None:
-                h, w = rgb.shape[:2]
-                scale = min(900 / w, 680 / h)
-                disp = cv2.resize(rgb, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
-                img = ImageTk.PhotoImage(Image.fromarray(disp))
-                self._update_preview(img)
+                self._update_preview_labels(rgb)
         self.root.after(self.preview_refresh_ms, self._ui_preview_tick)
 
-    def _update_preview(self, img: ImageTk.PhotoImage) -> None:
-        self.preview_label.configure(image=img, text="")
-        self.preview_label.image = img
+    def _fit_rgb_to_box(self, rgb, max_w: int, max_h: int):
+        h, w = rgb.shape[:2]
+        scale = min(max_w / w, max_h / h)
+        return cv2.resize(rgb, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
+    def _update_preview_labels(self, rgb) -> None:
+        setup_disp = self._fit_rgb_to_box(rgb, 900, 680)
+        setup_img = ImageTk.PhotoImage(Image.fromarray(setup_disp))
+        self.preview_label.configure(image=setup_img, text="")
+        self.preview_label.image = setup_img
+
+        demo_disp = self._fit_rgb_to_box(rgb, 1100, 700)
+        demo_img = ImageTk.PhotoImage(Image.fromarray(demo_disp))
+        self.demo_preview_label.configure(image=demo_img, text="")
+        self.demo_preview_label.image = demo_img
 
     def _set_black_level_zero(self) -> bool:
         if self.camera is None:
