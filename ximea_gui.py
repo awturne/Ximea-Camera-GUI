@@ -53,6 +53,7 @@ class XimeaApp:
         self.fps_var = tk.StringVar(value="FPS: --")
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
+        self.auto_preview_brightness_var = tk.BooleanVar(value=False)
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -90,6 +91,11 @@ class XimeaApp:
         ttk.Button(controls, text="Apply Camera Settings", command=self.apply_camera_settings).grid(
             row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0)
         )
+        ttk.Checkbutton(
+            controls,
+            text="Auto brightness (preview only)",
+            variable=self.auto_preview_brightness_var,
+        ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
         timed = ttk.LabelFrame(right, text="Timed Capture", padding=10)
         timed.pack(fill=tk.X, pady=(0, 10))
@@ -227,14 +233,17 @@ class XimeaApp:
         return frame.astype("uint16")
 
     def _mono16_to_preview_rgb(self, frame):
-        sample = frame[::4, ::4]
-        low = float(np.percentile(sample, 1.0))
-        high = float(np.percentile(sample, 99.5))
-        if high <= low:
-            preview_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        if self.auto_preview_brightness_var.get():
+            sample = frame[::4, ::4]
+            low = float(np.percentile(sample, 1.0))
+            high = float(np.percentile(sample, 99.5))
+            if high <= low:
+                preview_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            else:
+                clipped = np.clip(frame, low, high)
+                preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
         else:
-            clipped = np.clip(frame, low, high)
-            preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
+            preview_u8 = (frame >> 8).astype("uint8")
         return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
 
     def _ui_preview_tick(self) -> None:
