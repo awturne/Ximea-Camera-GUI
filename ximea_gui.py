@@ -18,28 +18,10 @@ def _bootstrap_ximea_paths() -> list[str]:
         return added_paths
 
     xiapi_root = Path(os.environ.get("XIAPI_DIR", r"C:\XIMEA\API"))
-    python_root = xiapi_root / "Python"
     candidates = [
-        python_root,
-        python_root / "v3",
-        python_root / "v2",
-        xiapi_root / "xiAPI" / "Python",
-        xiapi_root / "xiapi" / "Python",
-        xiapi_root / "xiAPI",
-        xiapi_root / "xiapi",
+        xiapi_root / "Python" / "v3",
+        xiapi_root / "Python",
     ]
-
-    if python_root.exists():
-        try:
-            for subdir in python_root.iterdir():
-                if not subdir.is_dir():
-                    continue
-                has_ximea_pkg = (subdir / "ximea").is_dir()
-                has_xiapi_module = (subdir / "xiapi.py").exists()
-                if has_ximea_pkg or has_xiapi_module:
-                    candidates.append(subdir)
-        except Exception:
-            pass
     for path in candidates:
         if path.exists():
             path_str = str(path)
@@ -47,13 +29,7 @@ def _bootstrap_ximea_paths() -> list[str]:
                 sys.path.insert(0, path_str)
                 added_paths.append(path_str)
 
-    dll_candidates = [
-        xiapi_root / "xiAPI",
-        xiapi_root / "xiapi",
-        xiapi_root / "xiAPI" / "bin",
-        xiapi_root / "xiapi" / "bin",
-    ]
-    for dll_dir in dll_candidates:
+    for dll_dir in (xiapi_root / "xiAPI", xiapi_root / "xiAPI" / "bin"):
         if dll_dir.exists():
             try:
                 os.add_dll_directory(str(dll_dir))
@@ -69,14 +45,8 @@ _PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 try:
     from ximea import xiapi
 except Exception as exc:  # pragma: no cover
-    try:
-        import xiapi as _xiapi_module
-
-        xiapi = _xiapi_module
-        _XIMEA_IMPORT_ERROR = f"from ximea import xiapi failed ({exc}); recovered using direct `import xiapi`"
-    except Exception as exc2:  # pragma: no cover
-        xiapi = None
-        _XIMEA_IMPORT_ERROR = f"{exc}; direct import fallback failed: {exc2}"
+    xiapi = None
+    _XIMEA_IMPORT_ERROR = str(exc)
 
 
 @dataclass
@@ -116,8 +86,7 @@ class XimeaApp:
         self.fps_var = tk.StringVar(value="FPS: --")
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
-        self.active_img_format = "unknown"
-        self.image_format_warning = None
+        self.active_img_format = "XI_MONO16"
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -291,8 +260,7 @@ class XimeaApp:
             self.camera = xiapi.Camera()
             self.camera.open_device()
             self.image = xiapi.Image()
-            self.image_format_warning = None
-            self.active_img_format = self._set_image_format()
+            self.camera.set_imgdataformat("XI_MONO16")
             black_ok = self._set_black_level_zero()
             self.apply_camera_settings(show_message=False)
             self.camera.start_acquisition()
@@ -305,63 +273,13 @@ class XimeaApp:
         self.preview_running = True
         self.preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
         self.preview_thread.start()
-        format_note = f"{self.active_img_format}" + (f", {self.image_format_warning}" if self.image_format_warning else "")
+        format_note = f"{self.active_img_format}"
         if black_ok:
             self._set_status(f"Preview running ({format_note})")
         else:
             self._set_status(
                 f"Preview running ({format_note}, warning: could not set sensor black level offset to 0)"
             )
-
-    def _set_image_format(self) -> str:
-        if self.camera is None:
-            raise RuntimeError("Camera is not connected.")
-
-        preferred = ["XI_MONO16", "XI_RAW16", "XI_MONO8", "XI_RAW8"]
-        format_values = []
-        for fmt in preferred:
-            format_values.append(fmt)
-            if hasattr(xiapi, fmt):
-                format_values.append(getattr(xiapi, fmt))
-        last_error = None
-        for fmt in format_values:
-            try:
-                self.camera.set_imgdataformat(fmt)
-                return str(fmt)
-            except Exception as exc:
-                last_error = exc
-        param_candidates = [
-            "imgdataformat",
-            "image_data_format",
-            "XI_PRM_IMAGE_DATA_FORMAT",
-        ]
-        for param_name in param_candidates:
-            for fmt in format_values:
-                try:
-                    self.camera.set_param(param_name, fmt)
-                    return f"{fmt} via {param_name}"
-                except Exception as exc:
-                    last_error = exc
-
-        self.image_format_warning = "using camera default imgdataformat"
-        return "camera-default"
-
-    def _try_set_param(self, method_name: str, value, param_names: list[str]) -> bool:
-        if self.camera is None:
-            return False
-        if hasattr(self.camera, method_name):
-            try:
-                getattr(self.camera, method_name)(value)
-                return True
-            except Exception:
-                pass
-        for name in param_names:
-            try:
-                self.camera.set_param(name, value)
-                return True
-            except Exception:
-                continue
-        return False
 
     def _preview_loop(self) -> None:
         while self.preview_running and self.camera is not None:
@@ -473,28 +391,14 @@ class XimeaApp:
             return
         try:
             cfg = self._parse_config()
-            failures = []
-            if not self._try_set_param("set_exposure", cfg.exposure_us, ["exposure", "XI_PRM_EXPOSURE"]):
-                failures.append("exposure")
-
-            # Some cameras require timing mode before accepting framerate.
-            self._try_set_param(
-                "set_acq_timing_mode",
-                "XI_ACQ_TIMING_MODE_FRAME_RATE",
-                ["acq_timing_mode", "XI_PRM_ACQ_TIMING_MODE"],
-            )
-            if not self._try_set_param("set_framerate", cfg.frame_rate, ["framerate", "XI_PRM_FRAMERATE"]):
-                failures.append("framerate")
-
-            if not self._try_set_param("set_gain", cfg.gain_db, ["gain", "XI_PRM_GAIN"]):
-                failures.append("gain")
+            self.camera.set_exposure(cfg.exposure_us)
+            self.camera.set_framerate(cfg.frame_rate)
+            self.camera.set_gain(cfg.gain_db)
             black_ok = self._set_black_level_zero()
             status = (
                 f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB"
                 + (", black level=0" if black_ok else ", black level=0 not supported by current XiAPI binding")
             )
-            if failures:
-                status += f", unsupported: {', '.join(failures)}"
             self._set_status(status)
         except Exception as exc:
             if show_message:
