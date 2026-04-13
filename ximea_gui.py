@@ -260,7 +260,7 @@ class XimeaApp:
             self.camera = xiapi.Camera()
             self.camera.open_device()
             self.image = xiapi.Image()
-            self.camera.set_imgdataformat("XI_MONO16")
+            self.active_img_format = self._configure_image_format()
             black_ok = self._set_black_level_zero()
             self.apply_camera_settings(show_message=False)
             self.camera.start_acquisition()
@@ -280,6 +280,26 @@ class XimeaApp:
             self._set_status(
                 f"Preview running ({format_note}, warning: could not set sensor black level offset to 0)"
             )
+
+    def _configure_image_format(self) -> str:
+        if self.camera is None:
+            raise RuntimeError("Camera is not connected.")
+
+        attempts = []
+        format_attempts = []
+        for name in ("XI_MONO16", "XI_RAW16"):
+            if hasattr(xiapi, name):
+                format_attempts.append((name, getattr(xiapi, name)))
+            format_attempts.append((name, name))
+
+        for name, value in format_attempts:
+            try:
+                self.camera.set_imgdataformat(value)
+                return name
+            except Exception as exc:
+                attempts.append(f"{name}: {exc}")
+
+        raise RuntimeError("Failed to set image format. " + " | ".join(attempts))
 
     def _preview_loop(self) -> None:
         while self.preview_running and self.camera is not None:
@@ -392,6 +412,12 @@ class XimeaApp:
         try:
             cfg = self._parse_config()
             self.camera.set_exposure(cfg.exposure_us)
+            if hasattr(self.camera, "set_acq_timing_mode"):
+                try:
+                    mode = getattr(xiapi, "XI_ACQ_TIMING_MODE_FRAME_RATE", "XI_ACQ_TIMING_MODE_FRAME_RATE")
+                    self.camera.set_acq_timing_mode(mode)
+                except Exception:
+                    pass
             self.camera.set_framerate(cfg.frame_rate)
             self.camera.set_gain(cfg.gain_db)
             black_ok = self._set_black_level_zero()
