@@ -21,6 +21,8 @@ def _bootstrap_ximea_paths() -> list[str]:
     python_root = xiapi_root / "Python"
     candidates = [
         python_root,
+        python_root / "v3",
+        python_root / "v2",
         xiapi_root / "xiAPI" / "Python",
         xiapi_root / "xiapi" / "Python",
         xiapi_root / "xiAPI",
@@ -28,13 +30,16 @@ def _bootstrap_ximea_paths() -> list[str]:
     ]
 
     if python_root.exists():
-        for subdir in python_root.iterdir():
-            if not subdir.is_dir():
-                continue
-            has_ximea_pkg = (subdir / "ximea").is_dir()
-            has_xiapi_module = (subdir / "xiapi.py").exists()
-            if has_ximea_pkg or has_xiapi_module:
-                candidates.append(subdir)
+        try:
+            for subdir in python_root.iterdir():
+                if not subdir.is_dir():
+                    continue
+                has_ximea_pkg = (subdir / "ximea").is_dir()
+                has_xiapi_module = (subdir / "xiapi.py").exists()
+                if has_ximea_pkg or has_xiapi_module:
+                    candidates.append(subdir)
+        except Exception:
+            pass
     for path in candidates:
         if path.exists():
             path_str = str(path)

@@ -50,7 +50,7 @@ python ximea_gui.py
 - Camera black level is set to `0` on connect/settings apply (using XiAPI direct method when available, otherwise via sensor feature selector/value params).
 - If `ximea-python` import fails on Windows, the app now auto-checks XiAPI locations under `C:\XIMEA\API`.
 - The app first tries `from ximea import xiapi`, then falls back to direct `import xiapi` from XiAPI SDK path(s) if available.
-- XiAPI SDK Python bindings may live in nested folders under `C:\XIMEA\API\Python` (version/arch-specific); the app now probes subfolders that contain `ximea` or `xiapi.py`.
+- XiAPI SDK Python bindings may live in nested folders under `C:\XIMEA\API\Python` (for example `...\Python\v3\...`); the app probes `Python\v3` and other nested subfolders that contain `ximea` or `xiapi.py`.
 - `ximea-python` may not be published for Python 3.13+ / 3.14 yet. If pip reports `No matching distribution found for ximea-python`, install Python 3.10-3.12 and rerun install.
 - If your SDK is installed elsewhere, set environment variable `XIAPI_DIR` to your XiAPI root before launching:
   ```bash
