@@ -50,6 +50,7 @@ def _bootstrap_ximea_paths() -> list[str]:
 
 _XIMEA_ADDED_PATHS = _bootstrap_ximea_paths()
 _XIMEA_IMPORT_ERROR = None
+_PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 try:
     from ximea import xiapi
 except Exception as exc:  # pragma: no cover
@@ -240,10 +241,17 @@ class XimeaApp:
     def connect_and_start(self) -> None:
         if xiapi is None:
             extra = ""
+            if sys.version_info >= (3, 13):
+                extra += (
+                    "\n\nDetected Python "
+                    + _PYTHON_VERSION
+                    + ". ximea-python is typically unavailable on Python 3.13+.\n"
+                    "Use Python 3.10-3.12 for XIMEA GUI."
+                )
             if _XIMEA_ADDED_PATHS:
-                extra = "\n\nSearched XiAPI paths:\n- " + "\n- ".join(_XIMEA_ADDED_PATHS)
+                extra += "\n\nSearched XiAPI paths:\n- " + "\n- ".join(_XIMEA_ADDED_PATHS)
             elif os.name == "nt":
-                extra = "\n\nExpected XiAPI install root (override with XIAPI_DIR):\n- C:\\XIMEA\\API"
+                extra += "\n\nExpected XiAPI install root (override with XIAPI_DIR):\n- C:\\XIMEA\\API"
             if _XIMEA_IMPORT_ERROR:
                 extra += f"\n\nImport error:\n{_XIMEA_IMPORT_ERROR}"
             messagebox.showerror(

@@ -24,7 +24,7 @@ Desktop GUI (Tkinter) for XIMEA camera live preview and interval-based frame cap
 ## Prerequisites (Windows)
 1. Install **XIMEA camera drivers + XiAPI SDK** from XIMEA.
    - Typical install root: `C:\XIMEA\API` (with subfolders like `Python` and `xiAPI`).
-2. Install Python 3.10+.
+2. Install Python **3.10 - 3.12** (recommended `3.11`).
 3. Install Python dependencies:
    ```bash
    pip install -r requirements.txt
@@ -49,6 +49,7 @@ python ximea_gui.py
 - Live preview uses auto-contrast stretching for better on-screen visibility in low-light scenes.
 - Camera black level is set to `0` on connect/settings apply (using XiAPI direct method when available, otherwise via sensor feature selector/value params).
 - If `ximea-python` import fails on Windows, the app now auto-checks XiAPI locations under `C:\XIMEA\API`.
+- `ximea-python` may not be published for Python 3.13+ / 3.14 yet. If pip reports `No matching distribution found for ximea-python`, install Python 3.10-3.12 and rerun install.
 - If your SDK is installed elsewhere, set environment variable `XIAPI_DIR` to your XiAPI root before launching:
   ```bash
   set XIAPI_DIR=D:\Your\Path\To\XIMEA\API
