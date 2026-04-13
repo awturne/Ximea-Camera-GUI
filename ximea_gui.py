@@ -54,6 +54,8 @@ class XimeaApp:
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
         self.auto_preview_brightness_var = tk.BooleanVar(value=False)
+        self.preview_gain_var = tk.StringVar(value="1.0")
+        self.preview_gamma_var = tk.StringVar(value="1.0")
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -96,6 +98,14 @@ class XimeaApp:
             text="Auto brightness (preview only)",
             variable=self.auto_preview_brightness_var,
         ).grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Label(controls, text="Preview gain (x)").grid(row=5, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(controls, textvariable=self.preview_gain_var, width=18).grid(
+            row=5, column=1, sticky="ew", padx=(8, 0), pady=(8, 0)
+        )
+        ttk.Label(controls, text="Preview gamma").grid(row=6, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(controls, textvariable=self.preview_gamma_var, width=18).grid(
+            row=6, column=1, sticky="ew", padx=(8, 0), pady=(8, 0)
+        )
 
         timed = ttk.LabelFrame(right, text="Timed Capture", padding=10)
         timed.pack(fill=tk.X, pady=(0, 10))
@@ -243,8 +253,27 @@ class XimeaApp:
                 clipped = np.clip(frame, low, high)
                 preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
         else:
-            preview_u8 = (frame >> 8).astype("uint8")
+            preview_f = (frame.astype("float32") / 65535.0) * self._get_preview_gain()
+            preview_f = np.clip(preview_f, 0.0, 1.0)
+            gamma = self._get_preview_gamma()
+            if gamma != 1.0:
+                preview_f = np.power(preview_f, gamma)
+            preview_u8 = (preview_f * 255.0).astype("uint8")
         return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
+
+    def _get_preview_gain(self) -> float:
+        try:
+            gain = float(self.preview_gain_var.get())
+            return min(16.0, max(0.1, gain))
+        except Exception:
+            return 1.0
+
+    def _get_preview_gamma(self) -> float:
+        try:
+            gamma = float(self.preview_gamma_var.get())
+            return min(3.0, max(0.2, gamma))
+        except Exception:
+            return 1.0
 
     def _ui_preview_tick(self) -> None:
         if self.preview_running:
