@@ -2,7 +2,9 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
+import os
 from pathlib import Path
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -10,10 +12,49 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
+def _bootstrap_ximea_paths() -> list[str]:
+    added_paths = []
+    if os.name != "nt":
+        return added_paths
+
+    xiapi_root = Path(os.environ.get("XIAPI_DIR", r"C:\XIMEA\API"))
+    candidates = [
+        xiapi_root / "Python",
+        xiapi_root / "xiAPI" / "Python",
+        xiapi_root / "xiapi" / "Python",
+        xiapi_root / "xiAPI",
+        xiapi_root / "xiapi",
+    ]
+    for path in candidates:
+        if path.exists():
+            path_str = str(path)
+            if path_str not in sys.path:
+                sys.path.insert(0, path_str)
+                added_paths.append(path_str)
+
+    dll_candidates = [
+        xiapi_root / "xiAPI",
+        xiapi_root / "xiapi",
+        xiapi_root / "xiAPI" / "bin",
+        xiapi_root / "xiapi" / "bin",
+    ]
+    for dll_dir in dll_candidates:
+        if dll_dir.exists():
+            try:
+                os.add_dll_directory(str(dll_dir))
+            except Exception:
+                pass
+
+    return added_paths
+
+
+_XIMEA_ADDED_PATHS = _bootstrap_ximea_paths()
+_XIMEA_IMPORT_ERROR = None
 try:
     from ximea import xiapi
-except Exception:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
     xiapi = None
+    _XIMEA_IMPORT_ERROR = str(exc)
 
 
 @dataclass
@@ -198,7 +239,19 @@ class XimeaApp:
 
     def connect_and_start(self) -> None:
         if xiapi is None:
-            messagebox.showerror("Missing dependency", "ximea-python was not found. Install requirements first.")
+            extra = ""
+            if _XIMEA_ADDED_PATHS:
+                extra = "\n\nSearched XiAPI paths:\n- " + "\n- ".join(_XIMEA_ADDED_PATHS)
+            elif os.name == "nt":
+                extra = "\n\nExpected XiAPI install root (override with XIAPI_DIR):\n- C:\\XIMEA\\API"
+            if _XIMEA_IMPORT_ERROR:
+                extra += f"\n\nImport error:\n{_XIMEA_IMPORT_ERROR}"
+            messagebox.showerror(
+                "Missing dependency",
+                "ximea-python / XiAPI could not be imported.\n"
+                "Install Python requirements and ensure XiAPI SDK is installed."
+                + extra,
+            )
             return
         if self.preview_running:
             self._set_status("Preview already running")
