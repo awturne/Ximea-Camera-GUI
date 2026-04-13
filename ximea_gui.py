@@ -371,7 +371,7 @@ class XimeaApp:
             if (
                 len(frame.shape) == 2
                 and frame.shape[1] % 2 == 0
-                and self.active_img_format in {"XI_MONO16", "XI_RAW16", "camera-default"}
+                and self.active_img_format in {"XI_MONO16", "XI_RAW16"}
             ):
                 low = frame[:, 0::2].astype("uint16")
                 high = frame[:, 1::2].astype("uint16")
@@ -455,9 +455,10 @@ class XimeaApp:
                 failures.append("exposure")
 
             # Some cameras require timing mode before accepting framerate.
+            timing_mode_value = getattr(xiapi, "XI_ACQ_TIMING_MODE_FRAME_RATE", "XI_ACQ_TIMING_MODE_FRAME_RATE")
             self._try_set_param(
                 "set_acq_timing_mode",
-                "XI_ACQ_TIMING_MODE_FRAME_RATE",
+                timing_mode_value,
                 ["acq_timing_mode", "XI_PRM_ACQ_TIMING_MODE"],
             )
             if not self._try_set_param("set_framerate", cfg.frame_rate, ["framerate", "XI_PRM_FRAMERATE"]):
@@ -579,6 +580,8 @@ class XimeaApp:
                 except Exception:
                     continue
         param_names = [
+            "temp",
+            "XI_PRM_TEMP",
             "device_temperature",
             "sensor_board_temp",
             "XI_PRM_DEVICE_TEMPERATURE",
