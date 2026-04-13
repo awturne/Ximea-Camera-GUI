@@ -54,8 +54,14 @@ _PYTHON_VERSION = f"{sys.version_info.major}.{sys.version_info.minor}"
 try:
     from ximea import xiapi
 except Exception as exc:  # pragma: no cover
-    xiapi = None
-    _XIMEA_IMPORT_ERROR = str(exc)
+    try:
+        import xiapi as _xiapi_module
+
+        xiapi = _xiapi_module
+        _XIMEA_IMPORT_ERROR = f"from ximea import xiapi failed ({exc}); recovered using direct `import xiapi`"
+    except Exception as exc2:  # pragma: no cover
+        xiapi = None
+        _XIMEA_IMPORT_ERROR = f"{exc}; direct import fallback failed: {exc2}"
 
 
 @dataclass
