@@ -317,12 +317,17 @@ class XimeaApp:
         if self.camera is None:
             raise RuntimeError("Camera is not connected.")
 
-        preferred = ["XI_MONO16", "XI_RAW16", "XI_MONO8"]
-        last_error = None
+        preferred = ["XI_MONO16", "XI_RAW16", "XI_MONO8", "XI_RAW8"]
+        format_values = []
         for fmt in preferred:
+            format_values.append(fmt)
+            if hasattr(xiapi, fmt):
+                format_values.append(getattr(xiapi, fmt))
+        last_error = None
+        for fmt in format_values:
             try:
                 self.camera.set_imgdataformat(fmt)
-                return fmt
+                return str(fmt)
             except Exception as exc:
                 last_error = exc
         param_candidates = [
@@ -331,7 +336,7 @@ class XimeaApp:
             "XI_PRM_IMAGE_DATA_FORMAT",
         ]
         for param_name in param_candidates:
-            for fmt in preferred:
+            for fmt in format_values:
                 try:
                     self.camera.set_param(param_name, fmt)
                     return f"{fmt} via {param_name}"
@@ -340,6 +345,23 @@ class XimeaApp:
 
         self.image_format_warning = "using camera default imgdataformat"
         return "camera-default"
+
+    def _try_set_param(self, method_name: str, value, param_names: list[str]) -> bool:
+        if self.camera is None:
+            return False
+        if hasattr(self.camera, method_name):
+            try:
+                getattr(self.camera, method_name)(value)
+                return True
+            except Exception:
+                pass
+        for name in param_names:
+            try:
+                self.camera.set_param(name, value)
+                return True
+            except Exception:
+                continue
+        return False
 
     def _preview_loop(self) -> None:
         while self.preview_running and self.camera is not None:
@@ -451,16 +473,32 @@ class XimeaApp:
             return
         try:
             cfg = self._parse_config()
-            self.camera.set_framerate(cfg.frame_rate)
-            self.camera.set_exposure(cfg.exposure_us)
-            self.camera.set_gain(cfg.gain_db)
+            failures = []
+            if not self._try_set_param("set_exposure", cfg.exposure_us, ["exposure", "XI_PRM_EXPOSURE"]):
+                failures.append("exposure")
+
+            # Some cameras require timing mode before accepting framerate.
+            self._try_set_param(
+                "set_acq_timing_mode",
+                "XI_ACQ_TIMING_MODE_FRAME_RATE",
+                ["acq_timing_mode", "XI_PRM_ACQ_TIMING_MODE"],
+            )
+            if not self._try_set_param("set_framerate", cfg.frame_rate, ["framerate", "XI_PRM_FRAMERATE"]):
+                failures.append("framerate")
+
+            if not self._try_set_param("set_gain", cfg.gain_db, ["gain", "XI_PRM_GAIN"]):
+                failures.append("gain")
             black_ok = self._set_black_level_zero()
-            self._set_status(
+            status = (
                 f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB"
                 + (", black level=0" if black_ok else ", black level=0 not supported by current XiAPI binding")
             )
+            if failures:
+                status += f", unsupported: {', '.join(failures)}"
+            self._set_status(status)
         except Exception as exc:
-            messagebox.showerror("Settings error", str(exc))
+            if show_message:
+                messagebox.showerror("Settings error", str(exc))
             self._set_status(f"Failed to apply settings: {exc}")
 
     def start_timed_capture(self) -> None:
