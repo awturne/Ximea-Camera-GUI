@@ -371,7 +371,7 @@ class XimeaApp:
             if (
                 len(frame.shape) == 2
                 and frame.shape[1] % 2 == 0
-                and self.active_img_format in {"XI_MONO16", "XI_RAW16"}
+                and self.active_img_format in {"XI_MONO16", "XI_RAW16", "camera-default"}
             ):
                 low = frame[:, 0::2].astype("uint16")
                 high = frame[:, 1::2].astype("uint16")
@@ -380,8 +380,8 @@ class XimeaApp:
         return frame.astype("uint16")
 
     def _mono16_to_preview_rgb(self, frame):
-        # Fixed preview mapping (no auto-brightness / LUT adaptation).
-        # Display uses a constant Mono12 scale: 0..4095 DN -> 0..255.
+        # Fixed preview mapping: no adaptive LUT / auto-brightness.
+        # Map Mono12 DN directly using a constant 0..4095 -> 0..255 scale.
         frame_u16 = frame.astype("uint16", copy=False)
         preview_u8 = (np.clip(frame_u16, 0, 4095) >> 4).astype("uint8")
         return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
