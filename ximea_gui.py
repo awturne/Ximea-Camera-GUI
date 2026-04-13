@@ -117,6 +117,7 @@ class XimeaApp:
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
         self.active_img_format = "unknown"
+        self.image_format_warning = None
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -290,6 +291,7 @@ class XimeaApp:
             self.camera = xiapi.Camera()
             self.camera.open_device()
             self.image = xiapi.Image()
+            self.image_format_warning = None
             self.active_img_format = self._set_image_format()
             black_ok = self._set_black_level_zero()
             self.apply_camera_settings(show_message=False)
@@ -303,11 +305,12 @@ class XimeaApp:
         self.preview_running = True
         self.preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
         self.preview_thread.start()
+        format_note = f"{self.active_img_format}" + (f", {self.image_format_warning}" if self.image_format_warning else "")
         if black_ok:
-            self._set_status(f"Preview running ({self.active_img_format})")
+            self._set_status(f"Preview running ({format_note})")
         else:
             self._set_status(
-                f"Preview running ({self.active_img_format}, warning: could not set sensor black level offset to 0)"
+                f"Preview running ({format_note}, warning: could not set sensor black level offset to 0)"
             )
 
     def _set_image_format(self) -> str:
@@ -322,7 +325,21 @@ class XimeaApp:
                 return fmt
             except Exception as exc:
                 last_error = exc
-        raise RuntimeError(f"imgdataformat unsupported for formats {preferred}: {last_error}")
+        param_candidates = [
+            "imgdataformat",
+            "image_data_format",
+            "XI_PRM_IMAGE_DATA_FORMAT",
+        ]
+        for param_name in param_candidates:
+            for fmt in preferred:
+                try:
+                    self.camera.set_param(param_name, fmt)
+                    return f"{fmt} via {param_name}"
+                except Exception as exc:
+                    last_error = exc
+
+        self.image_format_warning = "using camera default imgdataformat"
+        return "camera-default"
 
     def _preview_loop(self) -> None:
         while self.preview_running and self.camera is not None:
