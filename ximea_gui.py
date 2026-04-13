@@ -117,6 +117,7 @@ class XimeaApp:
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
         self.active_img_format = "unknown"
+        self.image_format_warning = None
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -290,6 +291,7 @@ class XimeaApp:
             self.camera = xiapi.Camera()
             self.camera.open_device()
             self.image = xiapi.Image()
+            self.image_format_warning = None
             self.active_img_format = self._set_image_format()
             black_ok = self._set_black_level_zero()
             self.apply_camera_settings(show_message=False)
@@ -303,30 +305,46 @@ class XimeaApp:
         self.preview_running = True
         self.preview_thread = threading.Thread(target=self._preview_loop, daemon=True)
         self.preview_thread.start()
-        status = f"Preview running ({self.active_img_format})"
-        if not black_ok:
-            status += " | black level offset not set to 0"
-        self._set_status(status)
+        format_note = f"{self.active_img_format}" + (f", {self.image_format_warning}" if self.image_format_warning else "")
+        if black_ok:
+            self._set_status(f"Preview running ({format_note})")
+        else:
+            self._set_status(
+                f"Preview running ({format_note}, warning: could not set sensor black level offset to 0)"
+            )
 
     def _set_image_format(self) -> str:
         if self.camera is None:
             raise RuntimeError("Camera is not connected.")
 
-        preferred = ("XI_MONO16", "XI_RAW16")
-        errors = []
+        preferred = ["XI_MONO16", "XI_RAW16", "XI_MONO8", "XI_RAW8"]
+        format_values = []
         for fmt in preferred:
-            attempts = []
+            format_values.append(fmt)
             if hasattr(xiapi, fmt):
-                attempts.append(getattr(xiapi, fmt))
-            attempts.append(fmt)
-            for value in attempts:
+                format_values.append(getattr(xiapi, fmt))
+        last_error = None
+        for fmt in format_values:
+            try:
+                self.camera.set_imgdataformat(fmt)
+                return str(fmt)
+            except Exception as exc:
+                last_error = exc
+        param_candidates = [
+            "imgdataformat",
+            "image_data_format",
+            "XI_PRM_IMAGE_DATA_FORMAT",
+        ]
+        for param_name in param_candidates:
+            for fmt in format_values:
                 try:
-                    self.camera.set_imgdataformat(value)
-                    return fmt
+                    self.camera.set_param(param_name, fmt)
+                    return f"{fmt} via {param_name}"
                 except Exception as exc:
-                    errors.append(f"{fmt}: {exc}")
+                    last_error = exc
 
-        raise RuntimeError("Unsupported image format for preview/capture. " + " | ".join(errors))
+        self.image_format_warning = "using camera default imgdataformat"
+        return "camera-default"
 
     def _try_set_param(self, method_name: str, value, param_names: list[str]) -> bool:
         if self.camera is None:
@@ -379,12 +397,14 @@ class XimeaApp:
         return frame.astype("uint16")
 
     def _mono16_to_preview_rgb(self, frame):
-        frame_u16 = frame.astype("uint16", copy=False)
-        max_dn = int(frame_u16.max()) if frame_u16.size else 0
-        if max_dn <= 4095:
-            preview_u8 = (np.clip(frame_u16, 0, 4095) >> 4).astype("uint8")
+        sample = frame[::4, ::4]
+        low = float(np.percentile(sample, 1.0))
+        high = float(np.percentile(sample, 99.5))
+        if high <= low:
+            preview_u8 = cv2.normalize(frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         else:
-            preview_u8 = (frame_u16 >> 8).astype("uint8")
+            clipped = np.clip(frame, low, high)
+            preview_u8 = ((clipped - low) * (255.0 / (high - low))).astype("uint8")
         return cv2.cvtColor(preview_u8, cv2.COLOR_GRAY2RGB)
 
     def _ui_preview_tick(self) -> None:
