@@ -99,8 +99,23 @@ class XimeaApp:
 
         ttk.Button(demo_right, text="Capture Image", command=self.demo_single_capture).pack(fill=tk.X, pady=(0, 10))
         ttk.Label(demo_right, text="Captured previews").pack(anchor="w")
-        self.demo_captured_container = ttk.Frame(demo_right)
-        self.demo_captured_container.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        self.demo_captured_scroll = ttk.Frame(demo_right)
+        self.demo_captured_scroll.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        self.demo_captured_canvas = tk.Canvas(self.demo_captured_scroll, borderwidth=0, highlightthickness=0, width=280)
+        self.demo_captured_scrollbar = ttk.Scrollbar(
+            self.demo_captured_scroll,
+            orient="vertical",
+            command=self.demo_captured_canvas.yview,
+        )
+        self.demo_captured_canvas.configure(yscrollcommand=self.demo_captured_scrollbar.set)
+        self.demo_captured_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.demo_captured_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.demo_captured_container = ttk.Frame(self.demo_captured_canvas)
+        self.demo_captured_window = self.demo_captured_canvas.create_window(
+            (0, 0), window=self.demo_captured_container, anchor="nw"
+        )
+        self.demo_captured_container.bind("<Configure>", self._on_demo_captured_configure)
+        self.demo_captured_canvas.bind("<Configure>", self._on_demo_captured_canvas_configure)
         self.demo_thumb_labels = []
         for i in range(8):
             lbl = ttk.Label(self.demo_captured_container, text="No capture yet" if i == 0 else "", anchor="center")
@@ -342,6 +357,12 @@ class XimeaApp:
         demo_img = ImageTk.PhotoImage(Image.fromarray(demo_disp))
         self.demo_preview_label.configure(image=demo_img, text="")
         self.demo_preview_label.image = demo_img
+
+    def _on_demo_captured_configure(self, _event=None) -> None:
+        self.demo_captured_canvas.configure(scrollregion=self.demo_captured_canvas.bbox("all"))
+
+    def _on_demo_captured_canvas_configure(self, event) -> None:
+        self.demo_captured_canvas.itemconfigure(self.demo_captured_window, width=event.width)
 
     def _capture_frame_to_output(self, prefix: str):
         if not self.preview_running:
