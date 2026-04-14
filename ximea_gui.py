@@ -414,14 +414,17 @@ class XimeaApp:
         y0 = max(0, (h - crop_size) // 2)
         return rgb[y0 : y0 + crop_size, :]
 
+    def _to_demo_view_rgb(self, rgb):
+        demo_base = self._fit_rgb_to_box(rgb, 820, 820)
+        return self._center_crop_demo_square(demo_base)
+
     def _update_preview_labels(self, rgb) -> None:
         setup_disp = self._fit_rgb_to_box(rgb, 900, 680)
         setup_img = ImageTk.PhotoImage(Image.fromarray(setup_disp))
         self.preview_label.configure(image=setup_img, text="")
         self.preview_label.image = setup_img
 
-        demo_base = self._fit_rgb_to_box(rgb, 820, 820)
-        demo_disp = self._center_crop_demo_square(demo_base)
+        demo_disp = self._to_demo_view_rgb(rgb)
         demo_img = ImageTk.PhotoImage(Image.fromarray(demo_disp))
         self.demo_preview_label.configure(image=demo_img, text="")
         self.demo_preview_label.image = demo_img
@@ -465,7 +468,8 @@ class XimeaApp:
 
     def _push_demo_capture_preview(self, frame, file_name: str) -> None:
         rgb = self._mono16_to_preview_rgb(frame)
-        thumb_rgb = self._fit_rgb_to_box(rgb, 420, 240)
+        thumb_demo_view = self._to_demo_view_rgb(rgb)
+        thumb_rgb = self._fit_rgb_to_box(thumb_demo_view, 420, 240)
         thumb_img = ImageTk.PhotoImage(Image.fromarray(thumb_rgb))
         self.demo_capture_thumbnails.insert(0, (thumb_img, file_name))
         self.demo_capture_thumbnails = self.demo_capture_thumbnails[: len(self.demo_thumb_labels)]
