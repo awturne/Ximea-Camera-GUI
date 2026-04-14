@@ -56,6 +56,7 @@ class XimeaApp:
         self.auto_preview_brightness_var = tk.BooleanVar(value=False)
         self.preview_gain_var = tk.StringVar(value="1.0")
         self.preview_gamma_var = tk.StringVar(value="1.0")
+        self.demo_capture_thumbnails = []
 
         self._build_ui()
         self._set_status("Disconnected")
@@ -88,8 +89,23 @@ class XimeaApp:
         self.preview_label = ttk.Label(left, text="No preview yet", anchor="center")
         self.preview_label.pack(fill=tk.BOTH, expand=True)
 
-        self.demo_preview_label = ttk.Label(demo_tab, text="No preview yet", anchor="center", padding=12)
+        demo_left = ttk.Frame(demo_tab, padding=12)
+        demo_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        demo_right = ttk.Frame(demo_tab, padding=12)
+        demo_right.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.demo_preview_label = ttk.Label(demo_left, text="No preview yet", anchor="center")
         self.demo_preview_label.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Button(demo_right, text="Capture Image", command=self.demo_single_capture).pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(demo_right, text="Captured previews").pack(anchor="w")
+        self.demo_captured_container = ttk.Frame(demo_right)
+        self.demo_captured_container.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+        self.demo_thumb_labels = []
+        for i in range(4):
+            lbl = ttk.Label(self.demo_captured_container, text="No capture yet" if i == 0 else "", anchor="center")
+            lbl.pack(fill=tk.X, pady=(0, 8))
+            self.demo_thumb_labels.append(lbl)
 
         controls = ttk.LabelFrame(right, text="Camera Controls", padding=10)
         controls.pack(fill=tk.X, pady=(0, 10))
@@ -327,6 +343,44 @@ class XimeaApp:
         self.demo_preview_label.configure(image=demo_img, text="")
         self.demo_preview_label.image = demo_img
 
+    def _capture_frame_to_output(self, prefix: str):
+        if not self.preview_running:
+            messagebox.showwarning("Not connected", "Connect and start preview first.")
+            return None, None
+        try:
+            cfg = self._parse_config()
+        except Exception as exc:
+            messagebox.showerror("Input error", str(exc))
+            return None, None
+
+        capture_dir = cfg.output_root / cfg.folder_name
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        with self._latest_lock:
+            frame = None if self.latest_frame is None else self.latest_frame.copy()
+        if frame is None:
+            self._set_status("No frame available yet for capture")
+            return None, None
+
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        file_path = capture_dir / f"{prefix}_{stamp}.tif"
+        self._save_uncompressed_tif(file_path, frame)
+        return file_path, frame
+
+    def _push_demo_capture_preview(self, frame, file_name: str) -> None:
+        rgb = self._mono16_to_preview_rgb(frame)
+        thumb_rgb = self._fit_rgb_to_box(rgb, 260, 180)
+        thumb_img = ImageTk.PhotoImage(Image.fromarray(thumb_rgb))
+        self.demo_capture_thumbnails.insert(0, (thumb_img, file_name))
+        self.demo_capture_thumbnails = self.demo_capture_thumbnails[: len(self.demo_thumb_labels)]
+        for idx, lbl in enumerate(self.demo_thumb_labels):
+            if idx < len(self.demo_capture_thumbnails):
+                img, name = self.demo_capture_thumbnails[idx]
+                lbl.configure(image=img, text=name, compound="top")
+                lbl.image = img
+            else:
+                lbl.configure(image="", text="No capture yet" if idx == 0 else "")
+                lbl.image = None
+
     def _set_black_level_zero(self) -> bool:
         if self.camera is None:
             return False
@@ -444,27 +498,16 @@ class XimeaApp:
         self._set_status("Stopping timed capture...")
 
     def single_capture(self) -> None:
-        if not self.preview_running:
-            messagebox.showwarning("Not connected", "Connect and start preview first.")
-            return
-        try:
-            cfg = self._parse_config()
-        except Exception as exc:
-            messagebox.showerror("Input error", str(exc))
-            return
+        file_path, _ = self._capture_frame_to_output("single")
+        if file_path is not None:
+            self._set_status(f"Single capture saved: {file_path.name}")
 
-        capture_dir = cfg.output_root / cfg.folder_name
-        capture_dir.mkdir(parents=True, exist_ok=True)
-        with self._latest_lock:
-            frame = None if self.latest_frame is None else self.latest_frame.copy()
-        if frame is None:
-            self._set_status("No frame available yet for single capture")
+    def demo_single_capture(self) -> None:
+        file_path, frame = self._capture_frame_to_output("demo")
+        if file_path is None or frame is None:
             return
-
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        file_path = capture_dir / f"single_{stamp}.tif"
-        self._save_uncompressed_tif(file_path, frame)
-        self._set_status(f"Single capture saved: {file_path.name}")
+        self._push_demo_capture_preview(frame, file_path.name)
+        self._set_status(f"Demo capture saved: {file_path.name}")
 
     def _countdown_tick(self) -> None:
         if self.capture_running and self.capture_end_time is not None:
