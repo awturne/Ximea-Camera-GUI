@@ -89,38 +89,85 @@ class XimeaApp:
         self.preview_label = ttk.Label(left, text="No preview yet", anchor="center")
         self.preview_label.pack(fill=tk.BOTH, expand=True)
 
-        demo_left = ttk.Frame(demo_tab, padding=12)
+        demo_tab.configure(bg="#343434")
+        demo_left = tk.Frame(demo_tab, bg="#343434", padx=18, pady=18)
         demo_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        demo_right = ttk.Frame(demo_tab, padding=12)
-        demo_right.pack(side=tk.RIGHT, fill=tk.Y)
+        demo_right = tk.Frame(demo_tab, bg="#1B3559", padx=16, pady=16)
+        demo_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        self.demo_preview_label = ttk.Label(demo_left, text="No preview yet", anchor="center")
-        self.demo_preview_label.pack(fill=tk.BOTH, expand=True)
+        tk.Label(
+            demo_left,
+            text="Establish baseline",
+            bg="#343434",
+            fg="white",
+            font=("Segoe UI", 28, "normal"),
+            anchor="w",
+        ).pack(fill=tk.X, pady=(0, 16))
+        baseline_lines = [
+            "- Confirm lights OFF",
+            "- Capture images using the button below",
+            "- Avoid imaging large bubbles, skin, nipple, and muscle",
+            "- Touch image to review or delete",
+        ]
+        for line in baseline_lines:
+            tk.Label(
+                demo_left,
+                text=line,
+                bg="#343434",
+                fg="white",
+                font=("Segoe UI", 12),
+                anchor="w",
+            ).pack(fill=tk.X, pady=(0, 6))
 
-        ttk.Button(demo_right, text="Capture Image", command=self.demo_single_capture).pack(fill=tk.X, pady=(0, 10))
-        ttk.Label(demo_right, text="Captured previews").pack(anchor="w")
-        self.demo_captured_scroll = ttk.Frame(demo_right)
-        self.demo_captured_scroll.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
-        self.demo_captured_canvas = tk.Canvas(self.demo_captured_scroll, borderwidth=0, highlightthickness=0, width=280)
-        self.demo_captured_scrollbar = ttk.Scrollbar(
-            self.demo_captured_scroll,
-            orient="vertical",
-            command=self.demo_captured_canvas.yview,
-        )
-        self.demo_captured_canvas.configure(yscrollcommand=self.demo_captured_scrollbar.set)
-        self.demo_captured_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.demo_captured_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.demo_captured_container = ttk.Frame(self.demo_captured_canvas)
-        self.demo_captured_window = self.demo_captured_canvas.create_window(
-            (0, 0), window=self.demo_captured_container, anchor="nw"
-        )
-        self.demo_captured_container.bind("<Configure>", self._on_demo_captured_configure)
-        self.demo_captured_canvas.bind("<Configure>", self._on_demo_captured_canvas_configure)
+        tk.Button(
+            demo_left,
+            text="Capture Image",
+            command=self.demo_single_capture,
+            bg="#6DBE45",
+            fg="black",
+            activebackground="#80d85a",
+            relief=tk.FLAT,
+            padx=10,
+            pady=6,
+        ).pack(anchor="w", pady=(8, 12))
+
+        self.demo_captured_container = tk.Frame(demo_left, bg="#2E2E2E", highlightbackground="#00AEEF", highlightthickness=1)
+        self.demo_captured_container.pack(fill=tk.BOTH, expand=True)
+        tk.Label(
+            self.demo_captured_container,
+            text="Image previews",
+            bg="#2E2E2E",
+            fg="#00AEEF",
+            font=("Segoe UI", 11),
+        ).grid(row=0, column=0, columnspan=2, sticky="e", padx=8, pady=(4, 0))
         self.demo_thumb_labels = []
         for i in range(8):
-            lbl = ttk.Label(self.demo_captured_container, text="No capture yet" if i == 0 else "", anchor="center")
-            lbl.pack(fill=tk.X, pady=(0, 8))
+            r = (i // 2) + 1
+            c = i % 2
+            lbl = tk.Label(
+                self.demo_captured_container,
+                text=f"{i + 1}",
+                bg="black",
+                fg="white",
+                compound="top",
+                width=22,
+                height=8,
+            )
+            lbl.grid(row=r, column=c, padx=8, pady=8, sticky="nsew")
             self.demo_thumb_labels.append(lbl)
+        self.demo_captured_container.grid_columnconfigure(0, weight=1)
+        self.demo_captured_container.grid_columnconfigure(1, weight=1)
+
+        tk.Label(demo_right, text="Live image preview", bg="#1B3559", fg="#FF4D4D", font=("Segoe UI", 12)).pack(anchor="nw")
+        self.demo_preview_label = tk.Label(demo_right, text="No preview yet", anchor="center", bg="#1B3559", fg="white")
+        self.demo_preview_label.pack(fill=tk.BOTH, expand=True)
+        tk.Label(
+            demo_right,
+            text="Simulation mode. Not for clinical use!",
+            bg="#1B3559",
+            fg="#2BC5F4",
+            font=("Segoe UI", 20),
+        ).pack(anchor="center", pady=(8, 0))
 
         controls = ttk.LabelFrame(right, text="Camera Controls", padding=10)
         controls.pack(fill=tk.X, pady=(0, 10))
@@ -353,16 +400,11 @@ class XimeaApp:
         self.preview_label.configure(image=setup_img, text="")
         self.preview_label.image = setup_img
 
-        demo_disp = self._center_crop_demo_square(setup_disp)
+        demo_base = self._fit_rgb_to_box(rgb, 820, 820)
+        demo_disp = self._center_crop_demo_square(demo_base)
         demo_img = ImageTk.PhotoImage(Image.fromarray(demo_disp))
         self.demo_preview_label.configure(image=demo_img, text="")
         self.demo_preview_label.image = demo_img
-
-    def _on_demo_captured_configure(self, _event=None) -> None:
-        self.demo_captured_canvas.configure(scrollregion=self.demo_captured_canvas.bbox("all"))
-
-    def _on_demo_captured_canvas_configure(self, event) -> None:
-        self.demo_captured_canvas.itemconfigure(self.demo_captured_window, width=event.width)
 
     def _capture_frame_to_output(self, prefix: str):
         if not self.preview_running:
