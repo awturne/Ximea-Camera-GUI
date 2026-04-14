@@ -139,23 +139,44 @@ class XimeaApp:
             fg="#00AEEF",
             font=("Segoe UI", 11),
         ).grid(row=0, column=0, columnspan=2, sticky="e", padx=8, pady=(4, 0))
+        self.demo_thumb_scroll = tk.Frame(self.demo_captured_container, bg="#2E2E2E")
+        self.demo_thumb_scroll.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=8, pady=(4, 8))
+        self.demo_thumb_canvas = tk.Canvas(
+            self.demo_thumb_scroll,
+            bg="#2E2E2E",
+            borderwidth=0,
+            highlightthickness=0,
+        )
+        self.demo_thumb_scrollbar = ttk.Scrollbar(
+            self.demo_thumb_scroll,
+            orient="vertical",
+            command=self.demo_thumb_canvas.yview,
+        )
+        self.demo_thumb_canvas.configure(yscrollcommand=self.demo_thumb_scrollbar.set)
+        self.demo_thumb_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.demo_thumb_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.demo_thumb_inner = tk.Frame(self.demo_thumb_canvas, bg="#2E2E2E")
+        self.demo_thumb_window = self.demo_thumb_canvas.create_window((0, 0), window=self.demo_thumb_inner, anchor="nw")
+        self.demo_thumb_inner.bind("<Configure>", self._on_demo_thumb_inner_configure)
+        self.demo_thumb_canvas.bind("<Configure>", self._on_demo_thumb_canvas_configure)
+        self.demo_thumb_canvas.bind("<MouseWheel>", self._on_demo_thumb_mousewheel)
+        self.demo_thumb_canvas.bind("<Button-4>", self._on_demo_thumb_mousewheel)
+        self.demo_thumb_canvas.bind("<Button-5>", self._on_demo_thumb_mousewheel)
         self.demo_thumb_labels = []
         for i in range(8):
-            r = (i // 2) + 1
-            c = i % 2
             lbl = tk.Label(
-                self.demo_captured_container,
+                self.demo_thumb_inner,
                 text=f"{i + 1}",
                 bg="black",
                 fg="white",
                 compound="top",
-                width=22,
-                height=8,
+                anchor="n",
+                pady=6,
             )
-            lbl.grid(row=r, column=c, padx=8, pady=8, sticky="nsew")
+            lbl.pack(fill=tk.X, pady=(0, 8))
             self.demo_thumb_labels.append(lbl)
         self.demo_captured_container.grid_columnconfigure(0, weight=1)
-        self.demo_captured_container.grid_columnconfigure(1, weight=1)
+        self.demo_captured_container.grid_rowconfigure(1, weight=1)
 
         tk.Label(demo_right, text="Live image preview", bg="#1B3559", fg="#FF4D4D", font=("Segoe UI", 12)).pack(anchor="nw")
         self.demo_preview_label = tk.Label(demo_right, text="No preview yet", anchor="center", bg="#1B3559", fg="white")
@@ -405,6 +426,20 @@ class XimeaApp:
         self.demo_preview_label.configure(image=demo_img, text="")
         self.demo_preview_label.image = demo_img
 
+    def _on_demo_thumb_inner_configure(self, _event=None) -> None:
+        self.demo_thumb_canvas.configure(scrollregion=self.demo_thumb_canvas.bbox("all"))
+
+    def _on_demo_thumb_canvas_configure(self, event) -> None:
+        self.demo_thumb_canvas.itemconfigure(self.demo_thumb_window, width=event.width)
+
+    def _on_demo_thumb_mousewheel(self, event) -> None:
+        if hasattr(event, "delta") and event.delta:
+            self.demo_thumb_canvas.yview_scroll(int(-event.delta / 120), "units")
+        elif getattr(event, "num", None) == 4:
+            self.demo_thumb_canvas.yview_scroll(-1, "units")
+        elif getattr(event, "num", None) == 5:
+            self.demo_thumb_canvas.yview_scroll(1, "units")
+
     def _capture_frame_to_output(self, prefix: str):
         if not self.preview_running:
             messagebox.showwarning("Not connected", "Connect and start preview first.")
@@ -430,7 +465,7 @@ class XimeaApp:
 
     def _push_demo_capture_preview(self, frame, file_name: str) -> None:
         rgb = self._mono16_to_preview_rgb(frame)
-        thumb_rgb = self._fit_rgb_to_box(rgb, 260, 180)
+        thumb_rgb = self._fit_rgb_to_box(rgb, 420, 240)
         thumb_img = ImageTk.PhotoImage(Image.fromarray(thumb_rgb))
         self.demo_capture_thumbnails.insert(0, (thumb_img, file_name))
         self.demo_capture_thumbnails = self.demo_capture_thumbnails[: len(self.demo_thumb_labels)]
