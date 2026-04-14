@@ -89,7 +89,6 @@ class XimeaApp:
         self.preview_label = ttk.Label(left, text="No preview yet", anchor="center")
         self.preview_label.pack(fill=tk.BOTH, expand=True)
 
-        demo_tab.configure(bg="#343434")
         demo_left = tk.Frame(demo_tab, bg="#343434", padx=18, pady=18)
         demo_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         demo_right = tk.Frame(demo_tab, bg="#1B3559", padx=16, pady=16)
