@@ -102,7 +102,7 @@ class XimeaApp:
         self.demo_captured_container = ttk.Frame(demo_right)
         self.demo_captured_container.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
         self.demo_thumb_labels = []
-        for i in range(4):
+        for i in range(8):
             lbl = ttk.Label(self.demo_captured_container, text="No capture yet" if i == 0 else "", anchor="center")
             lbl.pack(fill=tk.X, pady=(0, 8))
             self.demo_thumb_labels.append(lbl)
