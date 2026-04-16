@@ -31,6 +31,25 @@ Desktop GUI (Tkinter) for XIMEA camera live preview and interval-based frame cap
 python ximea_gui.py
 ```
 
+## Share as a standalone Windows app (no Python required on target PC)
+You can build an `.exe` for teammates who do not have Python installed.
+
+1. On your build machine (with Python), install runtime deps:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Run the PowerShell build script:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\build_windows_exe.ps1
+   ```
+3. Share the generated artifact:
+   - One-file mode (default): `dist\XimeaCameraGUI.exe`
+   - One-dir mode: run script with `-OneFile:$false` and share `dist\XimeaCameraGUI\`
+
+### Important
+- Target PCs still must install **XIMEA drivers + XiAPI SDK** before launching the app.
+- If the camera is not detected, verify XiAPI installation and USB/camera permissions.
+
 ## Typical workflow
 1. Click **Connect + Start Preview**.
 2. Set frame rate and exposure, then click **Apply Camera Settings**.
