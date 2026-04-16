@@ -45,6 +45,7 @@ You can build an `.exe` for teammates who do not have Python installed.
 3. Share the generated artifact:
    - One-file mode (default): `dist\XimeaCameraGUI.exe`
    - One-dir mode: run script with `-OneFile:$false` and share `dist\XimeaCameraGUI\`
+   - Custom output folder: add `-DistPath "C:\Builds\XimeaGUI"` if desired.
 
 ### Important
 - Target PCs still must install **XIMEA drivers + XiAPI SDK** before launching the app.
@@ -53,6 +54,7 @@ You can build an `.exe` for teammates who do not have Python installed.
 - If your XiAPI install is in a custom location, set:
   - `XIAPI_PYTHON_PATH` (folder that contains `ximea\xiapi.py`)
   - `XIAPI_BIN_PATH` (folder with XiAPI DLLs, typically `...\API\bin`)
+- If `PyInstaller` fails with `WinError 5` in OneDrive/git folders, the script already builds intermediate files in `%TEMP%` to reduce file-lock conflicts.
 
 ## Typical workflow
 1. Click **Connect + Start Preview**.
