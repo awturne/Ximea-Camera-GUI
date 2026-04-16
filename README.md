@@ -49,6 +49,10 @@ You can build an `.exe` for teammates who do not have Python installed.
 ### Important
 - Target PCs still must install **XIMEA drivers + XiAPI SDK** before launching the app.
 - If the camera is not detected, verify XiAPI installation and USB/camera permissions.
+- The app automatically checks common XiAPI install paths (`C:\XIMEA\API\...` and `C:\Program Files\XIMEA\API\...`).
+- If your XiAPI install is in a custom location, set:
+  - `XIAPI_PYTHON_PATH` (folder that contains `ximea\xiapi.py`)
+  - `XIAPI_BIN_PATH` (folder with XiAPI DLLs, typically `...\API\bin`)
 
 ## Typical workflow
 1. Click **Connect + Start Preview**.
