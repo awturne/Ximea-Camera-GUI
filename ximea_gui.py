@@ -2,18 +2,72 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
+import os
 from pathlib import Path
+import sys
 import tkinter as tk
 from tkinter import ttk, messagebox
+import importlib
 
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-try:
-    from ximea import xiapi
-except Exception:  # pragma: no cover
-    xiapi = None
+xiapi = None
+XIAPI_IMPORT_ERROR = None
+
+
+def _candidate_ximea_python_paths():
+    candidates = []
+    env_python_path = os.environ.get("XIAPI_PYTHON_PATH")
+    if env_python_path:
+        candidates.append(Path(env_python_path))
+    candidates.extend(
+        [
+            Path(r"C:\XIMEA\API\Python\v3"),
+            Path(r"C:\Program Files\XIMEA\API\Python\v3"),
+        ]
+    )
+    return [p for p in candidates if p.exists()]
+
+
+def _candidate_ximea_dll_paths():
+    candidates = []
+    env_bin_path = os.environ.get("XIAPI_BIN_PATH")
+    if env_bin_path:
+        candidates.append(Path(env_bin_path))
+    candidates.extend(
+        [
+            Path(r"C:\XIMEA\API\bin"),
+            Path(r"C:\Program Files\XIMEA\API\bin"),
+            Path(r"C:\XIMEA\API\Python\v3\ximea\libs"),
+            Path(r"C:\Program Files\XIMEA\API\Python\v3\ximea\libs"),
+        ]
+    )
+    return [p for p in candidates if p.exists()]
+
+
+def _load_xiapi():
+    global xiapi, XIAPI_IMPORT_ERROR
+    for p in _candidate_ximea_python_paths():
+        if str(p) not in sys.path:
+            sys.path.append(str(p))
+    if hasattr(os, "add_dll_directory"):
+        for p in _candidate_ximea_dll_paths():
+            try:
+                os.add_dll_directory(str(p))
+            except Exception:
+                continue
+    try:
+        xiapi_module = importlib.import_module("ximea.xiapi")
+        xiapi = xiapi_module
+        XIAPI_IMPORT_ERROR = None
+    except Exception as exc:  # pragma: no cover
+        xiapi = None
+        XIAPI_IMPORT_ERROR = exc
+
+
+_load_xiapi()
 
 
 @dataclass
@@ -296,7 +350,14 @@ class XimeaApp:
 
     def connect_and_start(self) -> None:
         if xiapi is None:
-            messagebox.showerror("Missing dependency", "ximea-python was not found. Install requirements first.")
+            err_text = "XiAPI could not be loaded."
+            if XIAPI_IMPORT_ERROR is not None:
+                err_text += f"\n\nDetails: {XIAPI_IMPORT_ERROR}"
+            err_text += (
+                "\n\nInstall XIMEA drivers + XiAPI SDK, or set XIAPI_PYTHON_PATH / XIAPI_BIN_PATH."
+                "\nTypical install path: C:\\XIMEA\\API\\..."
+            )
+            messagebox.showerror("Missing dependency", err_text)
             return
         if self.preview_running:
             self._set_status("Preview already running")
