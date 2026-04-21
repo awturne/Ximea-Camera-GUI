@@ -13,7 +13,12 @@ from PIL import Image, ImageTk
 try:
     from ximea import xiapi
 except Exception:  # pragma: no cover
-    xiapi = None
+    import sys as _sys
+    _sys.path.insert(0, r"C:\XIMEA\API\Python\v3")
+    try:
+        from ximea import xiapi
+    except Exception:
+        xiapi = None
 
 
 @dataclass
@@ -50,6 +55,8 @@ class XimeaApp:
         self.temperature_c = None
         self._last_frame_ts = None
         self._last_temp_ts = 0.0
+        self._pause_preview = False
+        self._target_fps = 30.0
         self.fps_var = tk.StringVar(value="FPS: --")
         self.mean_var = tk.StringVar(value="Mean DN: --")
         self.temp_var = tk.StringVar(value="Temp: --")
@@ -324,18 +331,26 @@ class XimeaApp:
             self._set_status("Preview running (warning: could not set sensor black level offset to 0)")
 
     def _preview_loop(self) -> None:
+        last_processed_ts = 0.0
         while self.preview_running and self.camera is not None:
+            if self._pause_preview:
+                time.sleep(0.05)
+                continue
             try:
                 self.camera.get_image(self.image)
+                now = time.monotonic()
+                target_interval = 1.0 / self._target_fps if self._target_fps > 0 else 0.0
+                if now - last_processed_ts < target_interval:
+                    continue  # drain camera buffer but skip processing this frame
                 frame = self._to_mono16(self.image.get_image_data_numpy())
                 preview_rgb = self._mono16_to_preview_rgb(frame)
-                now = time.monotonic()
                 if self._last_frame_ts is not None:
                     dt = now - self._last_frame_ts
                     if dt > 0:
                         inst_fps = 1.0 / dt
                         self.active_fps = (0.85 * self.active_fps) + (0.15 * inst_fps) if self.active_fps > 0 else inst_fps
                 self._last_frame_ts = now
+                last_processed_ts = now
                 self.mean_intensity = float(frame.mean())
                 if now - self._last_temp_ts >= 1.0:
                     self.temperature_c = self._read_camera_temperature()
@@ -530,13 +545,29 @@ class XimeaApp:
             return
         try:
             cfg = self._parse_config()
-            self.camera.set_framerate(cfg.frame_rate)
-            self.camera.set_exposure(cfg.exposure_us)
-            self.camera.set_gain(cfg.gain_db)
-            black_ok = self._set_black_level_zero()
+            was_running = self.preview_running
+            framerate_note = ""
+            if was_running:
+                self._pause_preview = True
+                time.sleep(0.1)  # let preview loop exit get_image
+                self.camera.stop_acquisition()
+            try:
+                try:
+                    self.camera.set_framerate(cfg.frame_rate)
+                except Exception:
+                    framerate_note = " (framerate not supported by this camera)"
+                self.camera.set_exposure(cfg.exposure_us)
+                self.camera.set_gain(cfg.gain_db)
+            finally:
+                if was_running:
+                    self.camera.start_acquisition()
+                    self._pause_preview = False
+            self._target_fps = cfg.frame_rate
+            self.active_fps = 0.0
+            self._last_frame_ts = None
             self._set_status(
-                f"Applied frame rate={cfg.frame_rate} fps, exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB"
-                + (", black level=0" if black_ok else ", black level=0 not supported by current XiAPI binding")
+                f"Applied frame rate={cfg.frame_rate} fps{framerate_note}, "
+                f"exposure={cfg.exposure_us} us, gain={cfg.gain_db} dB"
             )
         except Exception as exc:
             messagebox.showerror("Settings error", str(exc))
