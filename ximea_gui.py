@@ -263,6 +263,8 @@ class XimeaApp:
 
         ttk.Button(actions, text="Connect + Start Preview", command=self.connect_and_start).pack(fill=tk.X)
         ttk.Button(actions, text="Stop Preview", command=self.stop_preview).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(actions, text="Turn Off Status LEDs", command=self.turn_off_leds).pack(fill=tk.X, pady=(8, 0))
+        ttk.Button(actions, text="Turn On Status LEDs", command=self.turn_on_leds).pack(fill=tk.X, pady=(4, 0))
 
         self.status_var = tk.StringVar(value="")
         ttk.Label(right, textvariable=self.status_var, wraplength=320, justify=tk.LEFT).pack(fill=tk.X)
@@ -572,6 +574,31 @@ class XimeaApp:
         except Exception as exc:
             messagebox.showerror("Settings error", str(exc))
             self._set_status(f"Failed to apply settings: {exc}")
+
+    def _set_all_leds(self, mode: str) -> None:
+        for selector in ("XI_LED_SEL1", "XI_LED_SEL2", "XI_LED_SEL3", "XI_LED_SEL4", "XI_LED_SEL5"):
+            self.camera.set_led_selector(selector)
+            self.camera.set_led_mode(mode)
+
+    def turn_off_leds(self) -> None:
+        if self.camera is None:
+            self._set_status("Connect to camera first")
+            return
+        try:
+            self._set_all_leds("XI_LED_OFF")
+            self._set_status("Status LEDs turned off")
+        except Exception as exc:
+            self._set_status(f"Failed to turn off LEDs: {exc}")
+
+    def turn_on_leds(self) -> None:
+        if self.camera is None:
+            self._set_status("Connect to camera first")
+            return
+        try:
+            self._set_all_leds("XI_LED_ON")
+            self._set_status("Status LEDs turned on")
+        except Exception as exc:
+            self._set_status(f"Failed to turn on LEDs: {exc}")
 
     def start_timed_capture(self) -> None:
         if not self.preview_running:
